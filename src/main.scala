@@ -24,8 +24,9 @@ object main {
   def main(args: Array[String]): Unit = {
     println( unifyConstraints( 
         scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]( 
+            (new VarType("a"), new ArrowType(new VarType("b"),new VarType("c"))), (new VarType("b"), new IntType()), (new VarType("c"),new BoolType())
             //(new VarType("a"),new VarType("b")), (new VarType("b"),new VarType("c")), (new VarType("c"),new VarType("a"))
-            (new VarType("b"),new IntType()), (new VarType("a"),new VarType("c")), (new VarType("c"),new VarType("b"))
+            //(new VarType("b"),new IntType()), (new VarType("a"),new VarType("c")), (new VarType("c"),new VarType("b"))
         ) )
     );
   
@@ -39,10 +40,14 @@ object main {
     while(still_propigations){
       still_propigations = false;
       
-      for(i <- 0 until constraints.length){
+      var i = 0;
+      while(i < constraints.length){
         val constraint = constraints(i);
+        
+        println(i);
         println(constraints);
         println(subs+"\n");
+        
         constraint match {
           //case where constraint is tautology is ignored
           case (_:IntType, _:IntType) => {};
@@ -81,11 +86,13 @@ object main {
               still_propigations |= true;
             }
             replaceAllVarWithType(constraints, variable, arrow);
+            subs += (variable -> arrow);
           case (arrow:ArrowType, variable:VarType) =>
             if(recursive_checkIfArrowTypeContainsVars(arrow)){
               still_propigations |= true;
             }
             replaceAllVarWithType(constraints, variable, arrow);
+            subs += (variable -> arrow);
             
           //case of a var mapping to a var, will need to do another pass
           case (vara:VarType, varb:VarType) =>
@@ -103,27 +110,29 @@ object main {
             
           //case of an arrow to arrow, generate two additional constraints
           case (arrowa: ArrowType, arrowb:ArrowType) =>
+            constraints.remove(i);
+            i = i-1;
             constraints += new Tuple2(arrowa.src,arrowb.src);
             constraints += new Tuple2(arrowa.dst,arrowb.dst);
         }
+        i = i+1;
       }
     }
 
-    //finish propagation of substiutions (1 pass)
-    /*for(key <- subs.keys){
-      if(subs(key).isInstanceOf[VarType]){
-        subs(key) = subs(subs(key).asInstanceOf[VarType]);
-      }
-    }*/
     return Some(subs.toMap);
   }
 
   //find and replace all matching variables (whether prefix, postfix, or in arrow type in postfix) with the type t
   def replaceAllVarWithType(constraints: scala.collection.mutable.ListBuffer[Tuple2[Type,Type]], variable:VarType, t:Type) = {    
     for(i <- 0 until constraints.length){
+      //both sides need recursion
+      if(constraints(i)._1.isInstanceOf[ArrowType] && constraints(i)._2.isInstanceOf[ArrowType]){
+        constraints(i) = new Tuple2(recursive_replaceAllVarInArrowTypeWithType(constraints(i)._1.asInstanceOf[ArrowType], variable, t),
+                                    recursive_replaceAllVarInArrowTypeWithType(constraints(i)._2.asInstanceOf[ArrowType], variable, t));
+      }
       
       //right side is our variable
-      if(constraints(i)._2.equals(variable)){
+      else if(constraints(i)._2.equals(variable)){
         //left side is arrow type, needs recursion
         if(constraints(i)._1.isInstanceOf[ArrowType]){
           constraints(i) = new Tuple2(recursive_replaceAllVarInArrowTypeWithType(constraints(i)._1.asInstanceOf[ArrowType], variable, t),
@@ -135,16 +144,44 @@ object main {
         }
       }
       
+      //recurse on right rise
+      else if(constraints(i)._2.isInstanceOf[ArrowType]){
+        //left side is our variable
+        if(constraints(i)._1.equals(variable)){
+          constraints(i) = new Tuple2(t,
+                                      recursive_replaceAllVarInArrowTypeWithType(constraints(i)._2.asInstanceOf[ArrowType], variable, t));
+        }
+        //left side is left alone
+        else{
+          constraints(i) = new Tuple2(constraints(i)._2,
+                                      recursive_replaceAllVarInArrowTypeWithType(constraints(i)._2.asInstanceOf[ArrowType], variable, t));
+        }
+      }
+      
       //left side is our variable
       else if(constraints(i)._1.equals(variable)){
         //right side is arrow type, needs recursion
         if(constraints(i)._2.isInstanceOf[ArrowType]){
           constraints(i) = new Tuple2(t,
-                                        recursive_replaceAllVarInArrowTypeWithType(constraints(i)._2.asInstanceOf[ArrowType], variable, t));
+                                      recursive_replaceAllVarInArrowTypeWithType(constraints(i)._2.asInstanceOf[ArrowType], variable, t));
         }
         //right side can be left alone
         else{
           constraints(i) = new Tuple2(t, constraints(i)._2);
+        }
+      }
+      
+      //recurse on left rise
+      else if(constraints(i)._1.isInstanceOf[ArrowType]){
+        //right side is our variable
+        if(constraints(i)._2.equals(variable)){
+          constraints(i) = new Tuple2(recursive_replaceAllVarInArrowTypeWithType(constraints(i)._1.asInstanceOf[ArrowType], variable, t),
+                                      t);
+        }
+        //left side is left alone
+        else{
+          constraints(i) = new Tuple2(recursive_replaceAllVarInArrowTypeWithType(constraints(i)._1.asInstanceOf[ArrowType], variable, t),
+                                      constraints(i)._2);
         }
       }
       
@@ -176,6 +213,18 @@ object main {
                              recursive_replaceAllVarInArrowTypeWithType(constraint.dst.asInstanceOf[ArrowType], variable, t)); 
     }
     
+    //left side is our variable
+    if(constraint.src.equals(variable)){
+      //need to recurse on right
+      if(constraint.dst.isInstanceOf[ArrowType]){
+        return new ArrowType(t, recursive_replaceAllVarInArrowTypeWithType(constraint.dst.asInstanceOf[ArrowType], variable, t));
+      }
+      //right side is left alone
+      else{
+        return new ArrowType(t, constraint.dst);
+      }
+    }
+    
     //need to recurse on right
     if(constraint.dst.isInstanceOf[ArrowType]){
       //left side is our variable
@@ -185,6 +234,18 @@ object main {
       //left side should be left alone
       else{
         return new ArrowType(constraint.src, recursive_replaceAllVarInArrowTypeWithType(constraint.dst.asInstanceOf[ArrowType], variable, t));
+      }
+    }
+    
+    //right side is our variable
+    if(constraint.dst.equals(variable)){
+      //need to recurse on left
+      if(constraint.src.isInstanceOf[ArrowType]){
+        return new ArrowType(recursive_replaceAllVarInArrowTypeWithType(constraint.src.asInstanceOf[ArrowType], variable, t), t);
+      }
+      //left side is left alone
+      else{
+        return new ArrowType(constraint.src, t);
       }
     }
     
@@ -199,6 +260,8 @@ object main {
         return new ArrowType(recursive_replaceAllVarInArrowTypeWithType(constraint.src.asInstanceOf[ArrowType], variable, t), constraint.dst);
       }
     }
+    
+    
     
     //recurse on neither sides
     else{
