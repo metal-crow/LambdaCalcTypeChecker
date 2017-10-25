@@ -24,7 +24,8 @@ object main {
   def main(args: Array[String]): Unit = {
     println( unifyConstraints( 
         scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]( 
-            (new VarType("a"), new ArrowType(new VarType("b"),new VarType("c"))), (new VarType("b"), new IntType()), (new VarType("c"),new BoolType())
+            //(new VarType("a"), new ArrowType(new VarType("b"),new VarType("c"))), (new VarType("d"), new VarType("a"))
+            //(new VarType("a"), new ArrowType(new VarType("b"),new VarType("c"))), (new VarType("b"), new IntType()), (new VarType("c"),new BoolType())
             //(new VarType("a"),new VarType("b")), (new VarType("b"),new VarType("c")), (new VarType("c"),new VarType("a"))
             //(new VarType("b"),new IntType()), (new VarType("a"),new VarType("c")), (new VarType("c"),new VarType("b"))
         ) )
@@ -86,12 +87,14 @@ object main {
               still_propigations |= true;
             }
             replaceAllVarWithType(constraints, variable, arrow);
+            replaceAllSubVarsWithType(subs, variable, arrow);
             subs += (variable -> arrow);
           case (arrow:ArrowType, variable:VarType) =>
             if(recursive_checkIfArrowTypeContainsVars(arrow)){
               still_propigations |= true;
             }
             replaceAllVarWithType(constraints, variable, arrow);
+            replaceAllSubVarsWithType(subs, variable, arrow);
             subs += (variable -> arrow);
             
           //case of a var mapping to a var, will need to do another pass
