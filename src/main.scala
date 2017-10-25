@@ -24,8 +24,8 @@ object main {
   def main(args: Array[String]): Unit = {
     println( unifyConstraints( 
         scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]( 
-            
-            (new VarType("a"),new VarType("b")), (new VarType("b"),new IntType())
+            (new VarType("a"),new VarType("b")), (new VarType("b"),new VarType("c")), (new VarType("c"),new VarType("a"))
+            //(new VarType("a"),new VarType("b")), (new VarType("b"),new VarType("c")), (new VarType("c"),new IntType())
         ) )
     );
   
@@ -54,24 +54,41 @@ object main {
           case (_:BoolType, _:ArrowType) => return None;
   
           //replace all instances of var in constraints with the type
+          //also track as a substituition
           case (variable:VarType, t:IntType) =>
             constraints = replaceAllVarWithType(constraints, variable, t);
+            subs += (variable -> t);
           case (t:IntType, variable:VarType) =>
             constraints = replaceAllVarWithType(constraints, variable, t);
+            subs += (variable -> t);
           case (variable:VarType, t:BoolType) =>
             constraints = replaceAllVarWithType(constraints, variable, t);
+            subs += (variable -> t);
           case (t:BoolType, variable:VarType) =>
             constraints = replaceAllVarWithType(constraints, variable, t);
+            subs += (variable -> t);
             
           case (variable:VarType, arrow:ArrowType) => 
-            //TODO check if arrow type contains undefined vars. Need to continue propagation if so
+            //check if arrow type contains undefined vars. Need to continue propagation if so
+            if(recursive_checkIfArrowTypeContainsVars(arrow)){
+              still_propigations |= true;
+            }
             constraints = replaceAllVarWithType(constraints, variable, arrow);
           case (arrow:ArrowType, variable:VarType) =>
+            if(recursive_checkIfArrowTypeContainsVars(arrow)){
+              still_propigations |= true;
+            }
             constraints = replaceAllVarWithType(constraints, variable, arrow);
             
           //case of a var mapping to a var, will need to do another pass
           case (vara:VarType, varb:VarType) =>
-            //TODO check for circular dependency (var type = itself)
+            //check for circular dependency (var type = itself)
+            if(vara.equals(varb)){
+              return None;
+            }
+            if(!subs.keySet.contains(vara)){
+              subs += (vara -> varb);
+            }
             still_propigations |= true;
             constraints = replaceAllVarWithType(constraints, vara, varb);
             
@@ -83,6 +100,12 @@ object main {
       }
     }
 
+    //finish porpigation of subsitutions (1 pass)
+    for(key <- subs.keys){
+      if(subs(key).isInstanceOf[VarType]){
+        subs(key) = subs(subs(key).asInstanceOf[VarType]);
+      }
+    }
     return Some(subs.toMap);
   }
 
@@ -161,6 +184,18 @@ object main {
     //recurse on neither sides
     else{
       return constraint;
+    }
+  }
+ 
+  def recursive_checkIfArrowTypeContainsVars(constraint: Type) : Boolean = {
+    if(constraint.isInstanceOf[ArrowType]){
+      return recursive_checkIfArrowTypeContainsVars(constraint.asInstanceOf[ArrowType].src) || recursive_checkIfArrowTypeContainsVars(constraint.asInstanceOf[ArrowType].dst);
+    }
+    else if(constraint.isInstanceOf[VarType]){
+      return true;
+    }
+    else{
+      return false;
     }
   }
   
