@@ -24,8 +24,8 @@ object main {
   def main(args: Array[String]): Unit = {
     println( unifyConstraints( 
         scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]( 
-            (new VarType("a"),new VarType("b")), (new VarType("b"),new VarType("c")), (new VarType("c"),new VarType("a"))
-            //(new VarType("a"),new VarType("b")), (new VarType("b"),new VarType("c")), (new VarType("c"),new IntType())
+            //(new VarType("a"),new VarType("b")), (new VarType("b"),new VarType("c")), (new VarType("c"),new VarType("a"))
+            (new VarType("b"),new IntType()), (new VarType("a"),new VarType("c")), (new VarType("c"),new VarType("b"))
         ) )
     );
   
@@ -34,12 +34,15 @@ object main {
   def unifyConstraints(constraints_a: scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]) : Option[Map[VarType,Type]] = {
     var constraints = constraints_a;
     var still_propigations = true;
-    val subs = scala.collection.mutable.Map[VarType,Type]();
+    var subs = scala.collection.mutable.Map[VarType,Type]();
     
     while(still_propigations){
       still_propigations = false;
       
-      for(constraint <- constraints){
+      for(i <- 0 until constraints.length){
+        val constraint = constraints(i);
+        println(constraints);
+        println(subs+"\n");
         constraint match {
           //case where constraint is tautology is ignored
           case (_:IntType, _:IntType) => {};
@@ -56,16 +59,20 @@ object main {
           //replace all instances of var in constraints with the type
           //also track as a substituition
           case (variable:VarType, t:IntType) =>
-            constraints = replaceAllVarWithType(constraints, variable, t);
+            constraints = replaceAllVarWithType(constraints.toList, variable, t);
+            replaceAllSubVarsWithType(subs, variable, t);
             subs += (variable -> t);
           case (t:IntType, variable:VarType) =>
-            constraints = replaceAllVarWithType(constraints, variable, t);
+            constraints = replaceAllVarWithType(constraints.toList, variable, t);
+            replaceAllSubVarsWithType(subs, variable, t);
             subs += (variable -> t);
           case (variable:VarType, t:BoolType) =>
-            constraints = replaceAllVarWithType(constraints, variable, t);
+            constraints = replaceAllVarWithType(constraints.toList, variable, t);
+            replaceAllSubVarsWithType(subs, variable, t);
             subs += (variable -> t);
           case (t:BoolType, variable:VarType) =>
-            constraints = replaceAllVarWithType(constraints, variable, t);
+            constraints = replaceAllVarWithType(constraints.toList, variable, t);
+            replaceAllSubVarsWithType(subs, variable, t);
             subs += (variable -> t);
             
           case (variable:VarType, arrow:ArrowType) => 
@@ -73,24 +80,26 @@ object main {
             if(recursive_checkIfArrowTypeContainsVars(arrow)){
               still_propigations |= true;
             }
-            constraints = replaceAllVarWithType(constraints, variable, arrow);
+            constraints = replaceAllVarWithType(constraints.toList, variable, arrow);
           case (arrow:ArrowType, variable:VarType) =>
             if(recursive_checkIfArrowTypeContainsVars(arrow)){
               still_propigations |= true;
             }
-            constraints = replaceAllVarWithType(constraints, variable, arrow);
+            constraints = replaceAllVarWithType(constraints.toList, variable, arrow);
             
           //case of a var mapping to a var, will need to do another pass
           case (vara:VarType, varb:VarType) =>
             //check for circular dependency (var type = itself)
             if(vara.equals(varb)){
+              println("Circular depenency");
               return None;
             }
             if(!subs.keySet.contains(vara)){
               subs += (vara -> varb);
             }
             still_propigations |= true;
-            constraints = replaceAllVarWithType(constraints, vara, varb);
+            constraints = replaceAllVarWithType(constraints.toList, vara, varb);
+            replaceAllSubVarsWithType(subs, vara, varb);
             
           //case of an arrow to arrow, generate two additional constraints
           case (arrowa: ArrowType, arrowb:ArrowType) =>
@@ -100,17 +109,17 @@ object main {
       }
     }
 
-    //finish porpigation of subsitutions (1 pass)
-    for(key <- subs.keys){
+    //finish propagation of substiutions (1 pass)
+    /*for(key <- subs.keys){
       if(subs(key).isInstanceOf[VarType]){
         subs(key) = subs(subs(key).asInstanceOf[VarType]);
       }
-    }
+    }*/
     return Some(subs.toMap);
   }
 
   //find and replace all matching variables (whether prefix, postfix, or in arrow type in postfix) with the type t
-  def replaceAllVarWithType(constraints: scala.collection.mutable.ListBuffer[Tuple2[Type,Type]], variable:VarType, t:Type) : scala.collection.mutable.ListBuffer[Tuple2[Type,Type]] = {
+  def replaceAllVarWithType(constraints: List[Tuple2[Type,Type]], variable:VarType, t:Type) : scala.collection.mutable.ListBuffer[Tuple2[Type,Type]] = {
     var new_constraints = scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]();
     
     for(i <- 0 until constraints.length){
@@ -129,7 +138,7 @@ object main {
       }
       
       //left side is our variable
-      if(constraints(i)._1.equals(variable)){
+      else if(constraints(i)._1.equals(variable)){
         //right side is arrow type, needs recursion
         if(constraints(i)._2.isInstanceOf[ArrowType]){
           new_constraints += new Tuple2(t,
@@ -148,6 +157,20 @@ object main {
     }
     
     return new_constraints;
+  }
+  
+    def replaceAllSubVarsWithType(subs: scala.collection.mutable.Map[VarType,Type], variable:VarType, t:Type) = {
+    
+    for(sub <- subs.keys){
+      //right side is our variable
+      if(subs(sub).equals(variable)){
+        subs(sub) = t;
+      }
+      //right side is arrow type
+      if(subs(sub).isInstanceOf[ArrowType]){
+        subs(sub) = recursive_replaceAllVarInArrowTypeWithType(subs(sub).asInstanceOf[ArrowType], variable, t);
+      }
+    }    
   }
   
   def recursive_replaceAllVarInArrowTypeWithType(constraint: ArrowType, variable:VarType, t:Type) : ArrowType = {
