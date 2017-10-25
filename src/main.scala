@@ -59,19 +59,19 @@ object main {
           //replace all instances of var in constraints with the type
           //also track as a substituition
           case (variable:VarType, t:IntType) =>
-            constraints = replaceAllVarWithType(constraints.toList, variable, t);
+            replaceAllVarWithType(constraints, variable, t);
             replaceAllSubVarsWithType(subs, variable, t);
             subs += (variable -> t);
           case (t:IntType, variable:VarType) =>
-            constraints = replaceAllVarWithType(constraints.toList, variable, t);
+            replaceAllVarWithType(constraints, variable, t);
             replaceAllSubVarsWithType(subs, variable, t);
             subs += (variable -> t);
           case (variable:VarType, t:BoolType) =>
-            constraints = replaceAllVarWithType(constraints.toList, variable, t);
+            replaceAllVarWithType(constraints, variable, t);
             replaceAllSubVarsWithType(subs, variable, t);
             subs += (variable -> t);
           case (t:BoolType, variable:VarType) =>
-            constraints = replaceAllVarWithType(constraints.toList, variable, t);
+            replaceAllVarWithType(constraints, variable, t);
             replaceAllSubVarsWithType(subs, variable, t);
             subs += (variable -> t);
             
@@ -80,12 +80,12 @@ object main {
             if(recursive_checkIfArrowTypeContainsVars(arrow)){
               still_propigations |= true;
             }
-            constraints = replaceAllVarWithType(constraints.toList, variable, arrow);
+            replaceAllVarWithType(constraints, variable, arrow);
           case (arrow:ArrowType, variable:VarType) =>
             if(recursive_checkIfArrowTypeContainsVars(arrow)){
               still_propigations |= true;
             }
-            constraints = replaceAllVarWithType(constraints.toList, variable, arrow);
+            replaceAllVarWithType(constraints, variable, arrow);
             
           //case of a var mapping to a var, will need to do another pass
           case (vara:VarType, varb:VarType) =>
@@ -98,7 +98,7 @@ object main {
               subs += (vara -> varb);
             }
             still_propigations |= true;
-            constraints = replaceAllVarWithType(constraints.toList, vara, varb);
+            replaceAllVarWithType(constraints, vara, varb);
             replaceAllSubVarsWithType(subs, vara, varb);
             
           //case of an arrow to arrow, generate two additional constraints
@@ -119,21 +119,19 @@ object main {
   }
 
   //find and replace all matching variables (whether prefix, postfix, or in arrow type in postfix) with the type t
-  def replaceAllVarWithType(constraints: List[Tuple2[Type,Type]], variable:VarType, t:Type) : scala.collection.mutable.ListBuffer[Tuple2[Type,Type]] = {
-    var new_constraints = scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]();
-    
+  def replaceAllVarWithType(constraints: scala.collection.mutable.ListBuffer[Tuple2[Type,Type]], variable:VarType, t:Type) = {    
     for(i <- 0 until constraints.length){
       
       //right side is our variable
       if(constraints(i)._2.equals(variable)){
         //left side is arrow type, needs recursion
         if(constraints(i)._1.isInstanceOf[ArrowType]){
-          new_constraints += new Tuple2(recursive_replaceAllVarInArrowTypeWithType(constraints(i)._1.asInstanceOf[ArrowType], variable, t),
+          constraints(i) = new Tuple2(recursive_replaceAllVarInArrowTypeWithType(constraints(i)._1.asInstanceOf[ArrowType], variable, t),
                                       t);
         }
         //left side can be left alone
         else{
-          new_constraints += new Tuple2(constraints(i)._1, t);
+          constraints(i) = new Tuple2(constraints(i)._1, t);
         }
       }
       
@@ -141,22 +139,20 @@ object main {
       else if(constraints(i)._1.equals(variable)){
         //right side is arrow type, needs recursion
         if(constraints(i)._2.isInstanceOf[ArrowType]){
-          new_constraints += new Tuple2(t,
+          constraints(i) = new Tuple2(t,
                                         recursive_replaceAllVarInArrowTypeWithType(constraints(i)._2.asInstanceOf[ArrowType], variable, t));
         }
         //right side can be left alone
         else{
-          new_constraints += new Tuple2(t, constraints(i)._2);
+          constraints(i) = new Tuple2(t, constraints(i)._2);
         }
       }
       
       //leave both sides alone
       else{
-        new_constraints += constraints(i);
+        constraints(i) = constraints(i);
       }
-    }
-    
-    return new_constraints;
+    }    
   }
   
     def replaceAllSubVarsWithType(subs: scala.collection.mutable.Map[VarType,Type], variable:VarType, t:Type) = {
