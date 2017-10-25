@@ -25,7 +25,7 @@ object main {
     println( unifyConstraints( 
         scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]( 
             
-            //(new VarType("a"),new IntType()), (new VarType("a"),new IntType()), (new VarType("a"),new BoolType())
+            (new VarType("a"),new VarType("b")), (new VarType("b"),new IntType())
         ) )
     );
   
@@ -33,8 +33,8 @@ object main {
   
   def unifyConstraints(constraints_a: scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]) : Option[Map[VarType,Type]] = {
     var constraints = constraints_a;
-    val subs = scala.collection.mutable.Map[VarType,Type]();
     var still_propigations = true;
+    val subs = scala.collection.mutable.Map[VarType,Type]();
     
     while(still_propigations){
       still_propigations = false;
@@ -53,63 +53,27 @@ object main {
           case (_:ArrowType, _:BoolType) => return None;
           case (_:BoolType, _:ArrowType) => return None;
   
-          //case of a var mapping is checked against current substitution list
+          //replace all instances of var in constraints with the type
           case (variable:VarType, t:IntType) =>
-            if(subs.contains(variable) && !subs(variable).equals(t)){
-              return None;
-            } else{
-              //replace all instances of var in constraints with the type
-              constraints = replaceAllVarWithType(constraints, variable, t);
-              subs += (variable -> t);
-            }
+            constraints = replaceAllVarWithType(constraints, variable, t);
           case (t:IntType, variable:VarType) =>
-            if(subs.contains(variable) && !subs(variable).equals(t)){
-              return None;
-            } else{
-              constraints = replaceAllVarWithType(constraints, variable, t);
-              subs += (variable -> t);
-            }
+            constraints = replaceAllVarWithType(constraints, variable, t);
           case (variable:VarType, t:BoolType) =>
-            if(subs.contains(variable) && !subs(variable).equals(t)){
-              return None;
-            } else{
-              constraints = replaceAllVarWithType(constraints, variable, t);
-              subs += (variable -> t);
-            }
+            constraints = replaceAllVarWithType(constraints, variable, t);
           case (t:BoolType, variable:VarType) =>
-            if(subs.contains(variable) && !subs(variable).equals(t)){
-              return None;
-            } else{
-              constraints = replaceAllVarWithType(constraints, variable, t);
-              subs += (variable -> t);
-            }
+            constraints = replaceAllVarWithType(constraints, variable, t);
             
           case (variable:VarType, arrow:ArrowType) => 
-            if(subs.contains(variable) && !subs(variable).equals(arrow)){
-              return None;
-            } else{
-              //TODO check if arrow type contains undefined vars. Need to continue propagation if so
-              constraints = replaceAllVarWithType(constraints, variable, arrow);
-              subs += (variable -> arrow);
-            }
+            //TODO check if arrow type contains undefined vars. Need to continue propagation if so
+            constraints = replaceAllVarWithType(constraints, variable, arrow);
           case (arrow:ArrowType, variable:VarType) =>
-            if(subs.contains(variable) && !subs(variable).equals(arrow)){
-              return None;
-            } else{
-              constraints = replaceAllVarWithType(constraints, variable, arrow);
-              subs += (variable -> arrow);
-            }
+            constraints = replaceAllVarWithType(constraints, variable, arrow);
             
           //case of a var mapping to a var, will need to do another pass
           case (vara:VarType, varb:VarType) =>
-            if(subs.contains(vara) && !subs(vara).equals(varb)){
-              return None;
-            } else{
-              //TODO check for circuilar dependecy (var type = itself)
-              still_propigations |= true;
-              constraints = replaceAllVarWithType(constraints, vara, varb);
-              subs += (vara -> varb);
-            }
+            //TODO check for circular dependency (var type = itself)
+            still_propigations |= true;
+            constraints = replaceAllVarWithType(constraints, vara, varb);
             
           //case of an arrow to arrow, generate two additional constraints
           case (arrowa: ArrowType, arrowb:ArrowType) =>
@@ -127,15 +91,77 @@ object main {
     var new_constraints = scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]();
     
     for(i <- 0 until constraints.length){
+      
+      //right side is our variable
+      if(constraints(i)._2.equals(variable)){
+        //left side is arrow type, needs recursion
+        if(constraints(i)._1.isInstanceOf[ArrowType]){
+          new_constraints += new Tuple2(recursive_replaceAllVarInArrowTypeWithType(constraints(i)._1.asInstanceOf[ArrowType], variable, t),
+                                      t);
+        }
+        //left side can be left alone
+        else{
+          new_constraints += new Tuple2(constraints(i)._1, t);
+        }
+      }
+      
+      //left side is our variable
       if(constraints(i)._1.equals(variable)){
-        new_constraints += new Tuple2(t, constraints(i)._2);
+        //right side is arrow type, needs recursion
+        if(constraints(i)._2.isInstanceOf[ArrowType]){
+          new_constraints += new Tuple2(t,
+                                        recursive_replaceAllVarInArrowTypeWithType(constraints(i)._2.asInstanceOf[ArrowType], variable, t));
+        }
+        //right side can be left alone
+        else{
+          new_constraints += new Tuple2(t, constraints(i)._2);
+        }
       }
-      else if(constraints(i)._2.equals(variable)){
-        new_constraints += new Tuple2(constraints(i)._1, t);
+      
+      //leave both sides alone
+      else{
+        new_constraints += constraints(i);
       }
-      //TODO arrow types
     }
     
     return new_constraints;
   }
+  
+  def recursive_replaceAllVarInArrowTypeWithType(constraint: ArrowType, variable:VarType, t:Type) : ArrowType = {
+    //need to recurse on both sides
+    if(constraint.src.isInstanceOf[ArrowType] && constraint.dst.isInstanceOf[ArrowType]){
+        return new ArrowType(recursive_replaceAllVarInArrowTypeWithType(constraint.src.asInstanceOf[ArrowType], variable, t), 
+                             recursive_replaceAllVarInArrowTypeWithType(constraint.dst.asInstanceOf[ArrowType], variable, t)); 
+    }
+    
+    //need to recurse on right
+    if(constraint.dst.isInstanceOf[ArrowType]){
+      //left side is our variable
+      if(constraint.src.equals(variable)){
+        return new ArrowType(t, recursive_replaceAllVarInArrowTypeWithType(constraint.dst.asInstanceOf[ArrowType], variable, t));
+      }
+      //left side should be left alone
+      else{
+        return new ArrowType(constraint.src, recursive_replaceAllVarInArrowTypeWithType(constraint.dst.asInstanceOf[ArrowType], variable, t));
+      }
+    }
+    
+    //need to recurse on left
+    if(constraint.src.isInstanceOf[ArrowType]){
+      //right side is our variable
+      if(constraint.dst.equals(variable)){
+        return new ArrowType(recursive_replaceAllVarInArrowTypeWithType(constraint.src.asInstanceOf[ArrowType], variable, t), t);
+      }
+      //right side should be left alone
+      else{
+        return new ArrowType(recursive_replaceAllVarInArrowTypeWithType(constraint.src.asInstanceOf[ArrowType], variable, t), constraint.dst);
+      }
+    }
+    
+    //recurse on neither sides
+    else{
+      return constraint;
+    }
+  }
+  
 }
