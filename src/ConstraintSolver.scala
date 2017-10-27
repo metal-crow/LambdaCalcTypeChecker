@@ -19,7 +19,7 @@ case class BoolType() extends Type
 case class VarType(id: String) extends Type
 case class ArrowType(src: Type, dst: Type) extends Type
 
-object main {
+object ConstraintSolver {
   
   def main(args: Array[String]): Unit = {
     println( unifyConstraints( 
