@@ -3,11 +3,12 @@
 object TypeChecker {
   
   def main(args: Array[String]): Unit = {
-    val e = ;
+    //val e = (new Lambda("1", new Var("1"))); //λ1.1
+    //val e = (new Lambda("1", new Var("2"))); //λ1.2
+    
     println( typeCheck(e, Array[String]()) );
   }
   
-  //go through the given expression and generate a set of constrains. Then solve those constraints
   def typeCheck(e: Exp, environment: Array[String]): Option[Type] = {
     e match{
       //check that var is bound
