@@ -27,30 +27,32 @@ object TypeChecker {
       case a:Application => {
         val left_type = typeCheck(a.left, environment);
         val right_type = typeCheck(a.right, environment);
-        if(!left_type.isEmpty && !right_type.isEmpty){
+        if(left_type.isDefined && right_type.isDefined){
           return Some(new ArrowType(left_type.get, right_type.get));
         }
         return None;
       }
-      case c:Conditional => {};
-      case le:Let => {};//recurseLet(le.st, le.body);
+      case c:Conditional => {
+        val condition_type = typeCheck(c.cond, environment);
+        val consq_type = typeCheck(c.conseq, environment);
+        val alter_type = typeCheck(c.alter, environment);
+        if(condition_type.isDefined && consq_type.isDefined && alter_type.isDefined &&
+           //check the type output by the conditional is the same from both branches
+           consq_type.equals(alter_type))
+        {
+          return Some(new ArrowType(condition_type.get, alter_type.get));
+        }
+        return None;
+      }
+      case le:Let => return handleLet(le.st, typeCheck(le.body, environment));
     }
     return None;
   }
   
-  /*def recurseLet(left: Stmt, right: Exp) : Option[Tuple2[Type,Type]] = {
-    right match{
-      case v:Var => return Some(new VarType(TODO), new VarType(right.asInstanceOf[Var].id));
-      case _:Num => return Some(new VarType(TODO), new IntType());
-      case _:Bool => return Some(new VarType(TODO), new BoolType());
-      case la:Lambda => {
-        val result = recuseLambda(la);
-        if(result.empty()){
-          return None;
-        }
-        //match on last type on right of lambda
-        return return Some(new VarType(left.asInstanceOf[Var].id), );
-      }
+  def handleLet(state: Stmt, body: Option[Type]) : Option[Type] = {
+    state match {
+      case _: Empty => return None;
+      case as: Assign => 
     }
-  }*/
+  }
 }
