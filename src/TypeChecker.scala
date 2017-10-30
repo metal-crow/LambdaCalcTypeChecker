@@ -6,7 +6,46 @@ object TypeChecker {
     //val e = (new Lambda("1", new Var("1"))); //λ1.1
     //val e = (new Lambda("1", new Var("2"))); //λ1.2
     
-    println( typeCheck(e, Array[String]()) );
+    //(( (λx.(λy.(y x))) ( ( (λx0.(λx1.(x1 x0))) ((λx2.x2)12) ) (λx3.x3)))(λx4.x4))
+    /*val e = 
+      //(
+      new Application(
+        //(
+        new Application(
+          //(λx.(λy.(y x)))
+          new Lambda("x", new Lambda("y", new Application(new Var("y"), new Var("x")))),
+          //(
+          new Application(
+              //(
+              new Application(
+                //(λx0.(λx1.(x1 x0))) 
+                new Lambda("x0", new Lambda("x1", new Application(new Var("x1"), new Var("x0")))),
+                //((λx2.x2)12)
+                new Application(new Lambda("x2", new Var("x2")), new Num(12))
+              //)
+              ),
+              //(λx3.x3)
+              new Lambda("x3", new Var("x3"))
+          //)
+          )
+        //)
+        ),
+        //(λx4.x4)
+        new Lambda("x4", new Var("x4"))
+      //)
+      );*/
+    
+    //(((λx.(λy.(y x)))5)(λx0.x0))
+    val e = 
+      new Application(
+          new Application(
+              new Lambda("x", new Lambda("y", new Application(new Var("y"), new Var("x")))),
+              new Num(5)
+          ),
+          new Lambda("x0", new Var("x0"))
+      );
+    val res = typeCheck(e, Array[String]());
+    println(res);
   }
   
   def typeCheck(e: Exp, environment: Array[String]): Option[Type] = {
