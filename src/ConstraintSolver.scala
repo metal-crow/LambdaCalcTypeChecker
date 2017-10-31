@@ -45,9 +45,9 @@ object ConstraintSolver {
       while(i < constraints.length){
         val constraint = constraints(i);
         
-        println(i);
-        println(constraints);
-        println(subs+"\n");
+        //println(i);
+        //println(constraints);
+        //println(subs+"\n");
         
         constraint match {
           //case where constraint is tautology is ignored
@@ -101,7 +101,7 @@ object ConstraintSolver {
           case (vara:VarType, varb:VarType) =>
             //check for circular dependency (var type = itself)
             if(vara.equals(varb)){
-              println("Circular depenency");
+              //println("Circular depenency");
               return None;
             }
             if(!subs.keySet.contains(vara)){

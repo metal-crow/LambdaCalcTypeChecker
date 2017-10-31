@@ -1,42 +1,12 @@
-
+import scala.collection.mutable.ListBuffer
 
 object TypeChecker {
   
-  def main(args: Array[String]): Unit = {
-    //val e = (new Lambda("1", new Var("1"))); //λ1.1
-    //val e = (new Lambda("1", new Var("2"))); //λ1.2
-    
-    //(( (λx.(λy.(y x))) ( ( (λx0.(λx1.(x1 x0))) ((λx2.x2)12) ) (λx3.x3)))(λx4.x4))
-    /*val e = 
-      //(
-      new Application(
-        //(
-        new Application(
-          //(λx.(λy.(y x)))
-          new Lambda("x", new Lambda("y", new Application(new Var("y"), new Var("x")))),
-          //(
-          new Application(
-              //(
-              new Application(
-                //(λx0.(λx1.(x1 x0))) 
-                new Lambda("x0", new Lambda("x1", new Application(new Var("x1"), new Var("x0")))),
-                //((λx2.x2)12)
-                new Application(new Lambda("x2", new Var("x2")), new Num(12))
-              //)
-              ),
-              //(λx3.x3)
-              new Lambda("x3", new Var("x3"))
-          //)
-          )
-        //)
-        ),
-        //(λx4.x4)
-        new Lambda("x4", new Var("x4"))
-      //)
-      );*/
+  def main(args: Array[String]): Unit = {   
+    //Should successfully typecheck
     
     //(((λx.(λy.(y x)))5)(λx0.x0))
-    val e = 
+    val e0 = 
       new Application(
           new Application(
               new Lambda("x", new Lambda("y", new Application(new Var("y"), new Var("x")))),
@@ -44,54 +14,131 @@ object TypeChecker {
           ),
           new Lambda("x0", new Var("x0"))
       );
-    val res = typeCheck(e, Array[String]());
-    println(res);
+    println(e0);
+    println(typeCheck(e0));
+    
+    //((λx.(x 3))2)
+    val e1 = Application(Lambda("x", Application(Var("x"), Num(3))), Num(2))
+    println(e1);
+    println(typeCheck(e1));
+    
+    //should fail to type check
+    
+    //(λx.(x x))(λy.(y y))
+    val e2 = Application(Lambda("x", Application(Var("x"), Var("x"))), Lambda("y", Application(Var("y"), Var("y"))));
+    println(e2);
+    println(typeCheck(e2));
+    
+    val e3 = Application(Conditional(Lambda("x",Var("x")), Num(1), Num(2)), Var("z"));
+    println(e3)
+    println(typeCheck(e3));
   }
   
-  def typeCheck(e: Exp, environment: Array[String]): Option[Type] = {
+  def typeCheck(e: Exp): Option[Type] = {
+    val results = generateConstraints(e, Array());
+    freshvari=0; //reset fresh variable generator
+    //println("1 "+results._1.mkString(","));
+    //println("2 "+results._2.mkString(","));
+    //println("3 "+results._3);
+    val subs = ConstraintSolver.unifyConstraints(results._2.to[ListBuffer]);
+    //println("4 "+subs);
+    if(subs.isDefined && results._3.isInstanceOf[VarType]){
+      return Some(subs.get(results._3.asInstanceOf[VarType]));
+    }else{
+      return None;
+    }
+  }
+  
+  //returns Assumptions, Constraints, Type
+  def generateConstraints(e: Exp, environment: Array[String]) : Tuple3[Array[Tuple2[VarType,Type]], Array[Tuple2[Type,Type]], Type] = {
     e match{
-      //check that var is bound
       case v:Var => {
-        if(environment.contains(v.id)){
-          return Some(new VarType(v.id));
-        }else{
-          return None;
-        }
+        val typevar = generateNewFreshVar();
+        return Tuple3(Array(Tuple2(VarType(v.id),typevar)), Array(), typevar);
       }
-      case n:Num => return Some(new IntType());
-      case b:Bool => return Some(new BoolType());
-      //add binder to environment and check args
-      case la:Lambda => return typeCheck(la.body, environment :+ la.binder);
-      //recurse and check both sides
+      
+      case _:Num => {
+        val typevar = generateNewFreshVar();
+        return Tuple3(Array(), Array(Tuple2(typevar,IntType())), typevar);
+      }
+      case _:Bool => {
+        val typevar = generateNewFreshVar();
+        return Tuple3(Array(), Array(Tuple2(typevar,BoolType())), typevar);
+      }
+      
+      case la:Lambda => {
+        //generate type variable for abstraction
+        val lamb = generateNewFreshVar();
+        //generate constraints for body (with set binder)
+        //print("body\n");
+        var (assumptions_body, constraints_body, type_body) = generateConstraints(la.body, environment :+ la.binder);
+        //println("as "+assumptions_body.mkString(" "));
+        //println("cs "+constraints_body.mkString(" "));
+        //println("t "+type_body);
+        
+        //generate assumtions about fresh variables
+        return Tuple3(
+            (assumptions_body.filter({(n:Tuple2[VarType,Type]) => !la.binder.equals(n._1.id) })),
+            (constraints_body ++ assumptions_body.filter((n:Tuple2[VarType,Type]) => la.binder.equals(n._1.id))
+                .map((n:Tuple2[VarType,Type]) => Tuple2(n._2, lamb))), 
+            ArrowType(lamb, type_body)
+            );
+      }
+      
       case a:Application => {
-        val left_type = typeCheck(a.left, environment);
-        val right_type = typeCheck(a.right, environment);
-        if(left_type.isDefined && right_type.isDefined){
-          return Some(new ArrowType(left_type.get, right_type.get));
-        }
-        return None;
+        //generate constraints for function and argument
+        //print("left\n");
+        val (assumptions_l, constraints_l, type_l) = generateConstraints(a.left, environment);
+        //println("as "+assumptions_l.mkString(" "));
+        //println("cs "+constraints_l.mkString(" "));
+        //println("ty "+type_l);
+        //print("right\n");
+        val (assumptions_r, constraints_r, type_r) = generateConstraints(a.right, environment);
+        //println("as "+assumptions_r.mkString(" "));
+        //println("cs "+constraints_r.mkString(" "));
+        //println("ty "+type_r);
+        
+        //generate type variable for app
+        val app_typevar = generateNewFreshVar();
+        //union assumptions, union constraints + constraint for function
+        return Tuple3(
+            (assumptions_l ++ assumptions_r),
+            (constraints_l ++ constraints_r :+ Tuple2(type_l, ArrowType(type_r,app_typevar))),
+            app_typevar
+            );
       }
+      
       case c:Conditional => {
-        val condition_type = typeCheck(c.cond, environment);
-        val consq_type = typeCheck(c.conseq, environment);
-        val alter_type = typeCheck(c.alter, environment);
-        if(condition_type.isDefined && consq_type.isDefined && alter_type.isDefined &&
-           //check the type output by the conditional is the same from both branches
-           consq_type.equals(alter_type))
-        {
-          return Some(new ArrowType(condition_type.get, alter_type.get));
-        }
-        return None;
+        val (assumptions_cond, constraints_cond, type_cond) = generateConstraints(c.cond, environment);
+        val (assumptions_cons, constraints_cons, type_cons) = generateConstraints(c.conseq, environment);
+        val (assumptions_alter, constraints_alter, type_alter) = generateConstraints(c.alter, environment);
+
+        val cond_typevar = generateNewFreshVar();
+        return Tuple3(
+            (assumptions_cond ++ assumptions_cons ++ assumptions_alter),
+            (constraints_cond ++ constraints_cons ++ constraints_alter ++
+                Array(
+                    Tuple2(type_cond, BoolType()),
+                    Tuple2(type_cons, type_alter),
+                    Tuple2(cond_typevar, ArrowType(type_cond, type_cons))
+                    )
+            ),
+            cond_typevar
+            );
       }
+      
       //let is just a straightforward substitution, so handle it and get the resulting expression's type
       case le:Let => {
-        //convert into a map of id => expressions instead of weird resursive method
-        val letMap = generateLetMap(le.st);
-        //use that map to substitute
-        return typeCheck(handleLet(letMap, le.body), environment);
+        val letmap = generateLetMap(le.st);
+        return generateConstraints(handleLet(letmap, le.body), environment);
       }
     }
-    return None;
+  }
+  
+  var freshvari=0;
+  def generateNewFreshVar() : VarType = {
+    freshvari += 1;
+    return new VarType("T"+freshvari);
   }
   
   def generateLetMap(st: Stmt) : Map[String, Exp] = {
