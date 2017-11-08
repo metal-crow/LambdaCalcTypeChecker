@@ -32,9 +32,9 @@ object ConstraintSolver {
       while(i < constraints.length){
         val constraint = constraints(i);
         
-//        println(i);
-//        println(constraints.mkString(", \n"));
-//        println(subs.mkString(", \n"));
+        //println(i);
+        //println(constraints.mkString(", \n"));
+        //println(subs.mkString(", \n"));
         
         constraint match {
           //case where constraint is tautology is ignored
