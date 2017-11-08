@@ -45,9 +45,9 @@ object ConstraintSolver {
       while(i < constraints.length){
         val constraint = constraints(i);
         
-        //println(i);
-        //println(constraints);
-        //println(subs+"\n");
+        println(i);
+        println(constraints);
+        println(subs+"\n");
         
         constraint match {
           //case where constraint is tautology is ignored
@@ -134,6 +134,11 @@ object ConstraintSolver {
                                     recursive_replaceAllVarInArrowTypeWithType(constraints(i)._2.asInstanceOf[ArrowType], variable, t));
       }
       
+      //both sides are our variable
+      else if(constraints(i)._1.equals(variable) && constraints(i)._2.equals(variable)){
+        constraints(i) = new Tuple2(t, t);
+      }
+      
       //right side is our variable
       else if(constraints(i)._2.equals(variable)){
         //left side is arrow type, needs recursion
@@ -216,8 +221,13 @@ object ConstraintSolver {
                              recursive_replaceAllVarInArrowTypeWithType(constraint.dst.asInstanceOf[ArrowType], variable, t)); 
     }
     
+    //both sides are our variable
+    if(constraint.src.equals(variable) && constraint.dst.equals(variable)){
+      return new ArrowType(t, t);
+    }
+    
     //left side is our variable
-    if(constraint.src.equals(variable)){
+    else if(constraint.src.equals(variable)){
       //need to recurse on right
       if(constraint.dst.isInstanceOf[ArrowType]){
         return new ArrowType(t, recursive_replaceAllVarInArrowTypeWithType(constraint.dst.asInstanceOf[ArrowType], variable, t));
