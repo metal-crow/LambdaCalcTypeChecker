@@ -46,7 +46,7 @@ object ConstraintSolver {
         val constraint = constraints(i);
         
         println(i);
-        println(constraints);
+        println(constraints.mkString(", \n"));
         println(subs+"\n");
         
         constraint match {
@@ -161,7 +161,7 @@ object ConstraintSolver {
         }
         //left side is left alone
         else{
-          constraints(i) = new Tuple2(constraints(i)._2,
+          constraints(i) = new Tuple2(constraints(i)._1,
                                       recursive_replaceAllVarInArrowTypeWithType(constraints(i)._2.asInstanceOf[ArrowType], variable, t));
         }
       }
@@ -200,7 +200,7 @@ object ConstraintSolver {
     }    
   }
   
-    def replaceAllSubVarsWithType(subs: scala.collection.mutable.Map[VarType,Type], variable:VarType, t:Type) = {
+  def replaceAllSubVarsWithType(subs: scala.collection.mutable.Map[VarType,Type], variable:VarType, t:Type) = {
     
     for(sub <- subs.keys){
       //right side is our variable
