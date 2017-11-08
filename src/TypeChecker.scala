@@ -74,7 +74,7 @@ object TypeChecker {
       }
       case _:Bool => {
         val btype = generateNewFreshVar();
-        constraints += Tuple2(btype,IntType());
+        constraints += Tuple2(btype,BoolType());
         return btype;
       }
       
