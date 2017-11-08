@@ -102,7 +102,7 @@ object TypeChecker {
         
         //generate type variable and constraint for app
         val app_typevar = generateNewFreshVar();
-        constraints += Tuple2(type_l, ArrowType(type_r,app_typevar));
+        constraints += Tuple2(app_typevar, ArrowType(type_r,type_l));
         
         println(a+" -> "+app_typevar);
         println(" constrains "+Tuple2(type_l, ArrowType(type_r,app_typevar)));
