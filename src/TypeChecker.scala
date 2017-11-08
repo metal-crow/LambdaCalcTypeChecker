@@ -62,13 +62,12 @@ object TypeChecker {
         htest1, htest2, htest3, htest4, htest5, htest6, htest7, htest8, htest9, htest10, 
         htest11, htest12, htest13, htest14, htest15, htest16, htest17, htest18, htest19, htest20, 
         htest21, htest22, htest23, htest24, htest25, htest26, htest27, htest28, htest29, htest30,
-        htest31, htest32, htest33, htest34, htest34);
-        //test1, test2, test3, test4);
+        htest31, htest32, htest33, htest34, htest34,
+        test1, test2, test3, test4);
 
-    //for(i <- 0 until tests.length)
-    val i = 27;
+    for(i <- 0 until tests.length)
     {
-    print(typeCheck(tests(i))+"=====");
+    print(typeCheck(tests(i))+" <===== ");
     print(i+": ");
     println(tests(i));
     }
@@ -165,8 +164,8 @@ object TypeChecker {
       
       //let is just a straightforward substitution, so handle it and get the resulting expression's type
       case le:Let => {
-        val letmap = generateLetMap(le.st);
-        return generateConstraints(handleLet(letmap, le.body));
+        generateLetMap(le.st);
+        return generateConstraints(le.body);
       }
     }
   }
@@ -177,32 +176,18 @@ object TypeChecker {
     return new VarType("T"+freshvari);
   }
   
-  def generateLetMap(st: Stmt) : Map[String, Exp] = {
+  def generateLetMap(st: Stmt) : Unit = {
     st match{
-      case _: Empty => return Map();
-      case a: Assign => return Map((a.lhs, a.rhs));
-      case s: Seq => return generateLetMap(s.left) ++ generateLetMap(s.right);//right will overwrite left if needed
+      case _: Empty => {};
+      case a: Assign => {
+        val type_r = generateConstraints(a.rhs);
+        bindings += (a.lhs -> type_r);
+      };
+      case s: Seq => {
+        generateLetMap(s.left);
+        generateLetMap(s.right);
+      };
     }
   }
-  
-  def handleLet(map: Map[String, Exp], ex: Exp) : Exp = {
-    ex match{
-      case v: Var => {
-        if(map.keySet.contains(v.id)){
-          return map(v.id);
-        }else{
-          return v;
-        }
-      }
-      case n: Num => return n;
-      case b: Bool => return b;
-      case la: Lambda => return new Lambda(la.binder, handleLet(map, la.body));
-      case app: Application => return new Application(handleLet(map, app.left), handleLet(map, app.right));
-      case cond: Conditional => return new Conditional(handleLet(map, cond.cond), handleLet(map, cond.conseq), handleLet(map, cond.alter));
-      case le: Let => {
-        val letMap = map ++ generateLetMap(le.st);//right will overwrite left if needed
-        return handleLet(letMap, le.body);
-      }
-    }
-  }
+
 }
