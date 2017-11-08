@@ -21,10 +21,9 @@ case class ArrowType(src: Type, dst: Type) extends Type
 
 object ConstraintSolver {
   
-  def unifyConstraints(constraints_a: scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]) : Option[Map[VarType,Type]] = {
-    var constraints = constraints_a;
+  def unifyConstraints(constraints: scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]) : Option[Map[VarType,Type]] = {
     var still_propigations = true;
-    var subs = scala.collection.mutable.Map[VarType,Type]();
+    val subs = scala.collection.mutable.Map[VarType,Type]();
     
     while(still_propigations){
       still_propigations = false;

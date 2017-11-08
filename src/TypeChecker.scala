@@ -59,8 +59,8 @@ val htest35 = Let(Assign("x", Var("y")), Var("x"));
 
     for(i <- 0 until tests.length)
     {
-    println(htest2);
-    println("====="+typeCheck(htest2));
+    println(tests(i));
+    println("====="+typeCheck(tests(i)));
     }
 
     //((λx.(x 3))2) -> (Int, Int)
@@ -89,6 +89,8 @@ val htest35 = Let(Assign("x", Var("y")), Var("x"));
     //println("3 "+results._3);
     val subs = ConstraintSolver.unifyConstraints(constraints);
     println("Solved: "+subs);
+    constraints.clear();
+    bindings.clear();
     if(subs.isDefined && results.isInstanceOf[VarType]){
       return Some(subs.get(results.asInstanceOf[VarType]));
     }else{
