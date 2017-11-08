@@ -21,18 +21,6 @@ case class ArrowType(src: Type, dst: Type) extends Type
 
 object ConstraintSolver {
   
-  def main(args: Array[String]): Unit = {
-    println( unifyConstraints( 
-        scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]( 
-            //(new VarType("a"), new ArrowType(new VarType("b"),new VarType("c"))), (new VarType("d"), new VarType("a"))
-            //(new VarType("a"), new ArrowType(new VarType("b"),new VarType("c"))), (new VarType("b"), new IntType()), (new VarType("c"),new BoolType())
-            //(new VarType("a"),new VarType("b")), (new VarType("b"),new VarType("c")), (new VarType("c"),new VarType("a"))
-            //(new VarType("b"),new IntType()), (new VarType("a"),new VarType("c")), (new VarType("c"),new VarType("b"))
-        ) )
-    );
-  
-  }
-  
   def unifyConstraints(constraints_a: scala.collection.mutable.ListBuffer[Tuple2[Type,Type]]) : Option[Map[VarType,Type]] = {
     var constraints = constraints_a;
     var still_propigations = true;
@@ -45,9 +33,9 @@ object ConstraintSolver {
       while(i < constraints.length){
         val constraint = constraints(i);
         
-        println(i);
-        println(constraints.mkString(", \n"));
-        println(subs+"\n");
+//        println(i);
+//        println(constraints.mkString(", \n"));
+//        println(subs.mkString(", \n"));
         
         constraint match {
           //case where constraint is tautology is ignored
